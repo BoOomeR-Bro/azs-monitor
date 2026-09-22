@@ -12,19 +12,16 @@ STATE_FILE = "notified.json"
 REMINDER_HOURS = 2  # Интервал напоминаний в часах
 
 def load_notified():
-    """Загружает состояние с временными метками"""
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 def save_notified(notified_dict):
-    """Сохраняет состояние с временными метками"""
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(notified_dict, f, indent=2, ensure_ascii=False)
 
 def is_kaluga(address):
-    """Проверяет, находится ли заправка в городе Калуга"""
     addr_lower = address.lower().replace(" ", "")
     return "г.калуга" in addr_lower or "калуга," in addr_lower
 
@@ -49,46 +46,46 @@ def main():
         ai92 = props.get("ai92", False)
         ai95 = props.get("ai95", False)
         station_id = props.get("id")
-
+        
+        # Получаем координаты из GeoJSON (долгота, широта)
+        geometry = feature.get("geometry", {})
+        coords = geometry.get("coordinates", [])
+        
         # Фильтр: только заправки в г. Калуга
         if not is_kaluga(address):
             continue
 
-        # Проверяем наличие АИ-92 ИЛИ АИ-95
         has_fuel = ai92 is True or ai95 is True
 
         if has_fuel:
-            # Формируем список доступного топлива
             fuels = []
             if ai92: fuels.append("АИ-92")
             if ai95: fuels.append("АИ-95")
             fuels_str = " и ".join(fuels)
 
-            # Проверяем, нужно ли отправить уведомление
             should_notify = False
             is_new = False
-            is_reminder = False
 
             if station_id not in notified:
-                # Новая заправка с бензином
                 should_notify = True
                 is_new = True
             else:
-                # Проверяем, прошло ли 2 часа с последнего уведомления
                 last_notified = datetime.fromisoformat(notified[station_id])
                 if now - last_notified >= timedelta(hours=REMINDER_HOURS):
                     should_notify = True
-                    is_reminder = True
 
             if should_notify:
-                # Обновляем время последнего уведомления
                 notified[station_id] = now.isoformat()
 
-                # Формируем сообщение
-                if is_new:
-                    header = "⛽️ *НОВОЕ ТОПЛИВО В КАЛУГЕ!*"
+                header = "⛽️ *НОВОЕ ТОПЛИВО В КАЛУГЕ!*" if is_new else "⛽️ *ТОПЛИВО ВСЁ ЕЩЁ ЕСТЬ!*"
+
+                # Формируем ссылку на Яндекс.Карты
+                if len(coords) >= 2:
+                    lon, lat = coords[0], coords[1]
+                    map_url = f"https://yandex.ru/maps/?pt={lon},{lat}&z=16&l=map"
                 else:
-                    header = "⛽️ *ТОПЛИВО ВСЁ ЕЩЁ ЕСТЬ!*"
+                    # Фоллбэк, если координат вдруг нет
+                    map_url = f"https://yandex.ru/maps/?text={address.replace(' ', '+')}"
 
                 msg = (
                     f"{header}\n\n"
@@ -96,11 +93,10 @@ def main():
                     f"📍 {address}\n"
                     f"✅ В наличии: *{fuels_str}*\n"
                     f"🕒 Обновлено: {update_time}\n\n"
-                    f"🔗 Открыть карту"
+                    f"[🔗 Открыть карту]({map_url})"
                 )
                 new_notifications.append(msg)
 
-        # Если топлива больше нет, удаляем из списка
         elif not has_fuel and station_id in notified:
             del notified[station_id]
 
