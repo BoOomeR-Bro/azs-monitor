@@ -31,29 +31,39 @@ def main():
 
     for feature in data.get("features", []):
         props = feature.get("properties", {})
-        name3 = props.get("name3", "").lower()
-        address = props.get("address", "")
-        update_time = props.get("update", "")
+        name3 = props.get("name3", "Неизвестная АЗС")
+        address = props.get("address", "Адрес не указан")
+        update_time = props.get("update", "Неизвестно")
+        ai92 = props.get("ai92", False)
         ai95 = props.get("ai95", False)
         station_id = props.get("id")
 
-        # Проверяем: это Роснефть и есть 95-й бензин?
-        if "роснефть" in name3 and ai95 is True:
+        # Проверяем наличие АИ-92 ИЛИ АИ-95
+        has_fuel = ai92 is True or ai95 is True
+        
+        if has_fuel:
             if station_id not in notified:
-                # Новая заправка с 95-м! Добавляем в список и готовим сообщение
                 notified.add(station_id)
+                
+                # Формируем список доступного топлива для красивого вывода
+                fuels = []
+                if ai92: fuels.append("АИ-92")
+                if ai95: fuels.append("АИ-95")
+                fuels_str = " и ".join(fuels)
+                
                 msg = (
-                    f"⛽️ *ПОЯВИЛСЯ АИ-95!*\n\n"
-                    f"🏢 *{props.get('name3')}*\n"
+                    f"⛽️ *ЕСТЬ ТОПЛИВО!*\n\n"
+                    f"🏢 *{name3}*\n"
                     f"📍 {address}\n"
+                    f"✅ В наличии: *{fuels_str}*\n"
                     f"🕒 Обновлено: {update_time}\n\n"
                     f"🔗 [Открыть карту](https://azs.geoportal40.ru/)"
                 )
                 new_notifications.append(msg)
         
-        # Если 95-го больше нет, удаляем из списка "уведомленных", 
-        # чтобы в следующий раз при появлении снова прислать алерт
-        elif "роснефть" in name3 and station_id in notified:
+        # Если топлива (и 92, и 95) больше нет, удаляем из списка "уведомленных",
+        # чтобы при следующем завозе бензина снова прислать алерт
+        elif not has_fuel and station_id in notified:
             notified.remove(station_id)
 
     if new_notifications:
@@ -67,8 +77,8 @@ def main():
             })
         print(f"✅ Отправлено {len(new_notifications)} уведомлений.")
     else:
-        print("ℹ️ Новых появлений АИ-95 на Роснефти не обнаружено.")
-        save_notified(notified) # Сохраняем на случай, если что-то удалилось из списка
+        print("ℹ️ Изменений в наличии АИ-92 / АИ-95 не обнаружено.")
+        save_notified(notified)
 
 if __name__ == "__main__":
     main()
