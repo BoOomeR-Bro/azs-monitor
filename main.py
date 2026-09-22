@@ -17,6 +17,11 @@ def save_notified(notified_set):
         for item in notified_set:
             f.write(f"{item}\n")
 
+def is_kaluga(address):
+    """Проверяет, находится ли заправка в городе Калуга"""
+    addr_lower = address.lower().replace(" ", "")
+    return "г.калуга" in addr_lower or "калуга," in addr_lower
+
 def main():
     try:
         response = requests.get(API_URL, timeout=15)
@@ -38,6 +43,10 @@ def main():
         ai95 = props.get("ai95", False)
         station_id = props.get("id")
 
+        # Фильтр: только заправки в г. Калуга
+        if not is_kaluga(address):
+            continue
+
         # Проверяем наличие АИ-92 ИЛИ АИ-95
         has_fuel = ai92 is True or ai95 is True
         
@@ -52,7 +61,7 @@ def main():
                 fuels_str = " и ".join(fuels)
                 
                 msg = (
-                    f"⛽️ *ЕСТЬ ТОПЛИВО!*\n\n"
+                    f"⛽️ *ЕСТЬ ТОПЛИВО В КАЛУГЕ!*\n\n"
                     f"🏢 *{name3}*\n"
                     f"📍 {address}\n"
                     f"✅ В наличии: *{fuels_str}*\n"
@@ -75,9 +84,9 @@ def main():
                 "text": msg,
                 "parse_mode": "Markdown"
             })
-        print(f"✅ Отправлено {len(new_notifications)} уведомлений.")
+        print(f"✅ Отправлено {len(new_notifications)} уведомлений по Калуге.")
     else:
-        print("ℹ️ Изменений в наличии АИ-92 / АИ-95 не обнаружено.")
+        print("ℹ️ Изменений в наличии АИ-92 / АИ-95 в г. Калуга не обнаружено.")
         save_notified(notified)
 
 if __name__ == "__main__":
